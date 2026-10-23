@@ -36,6 +36,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             andEventID: AEEventID(kAEGetURL)
         )
         
+        // Register for document open events (file:// URLs, HTML files from Finder)
+        eventManager.setEventHandler(
+            self,
+            andSelector: #selector(handleOpenDocumentsEvent(_:withReply:)),
+            forEventClass: AEEventClass(kCoreEventClass),
+            andEventID: AEEventID(kAEOpenDocuments)
+        )
+        
         // Activate app so it shows in System Preferences > Default Browser
         NSApp.activate(ignoringOtherApps: true)
         
@@ -61,5 +69,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         NSLog("✅ ChooseBrowser: Received URL: \(url)")
         ruleManager.handleURL(url)
+    }
+    
+    @objc func handleOpenDocumentsEvent(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
+        // kAEOpenDocuments event contains a list of file URLs
+        guard let fileList = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject)) else {
+            NSLog("❌ ChooseBrowser: No files in open documents event")
+            return
+        }
+        
+        // Handle single file or list of files
+        if fileList.descriptorType == AEEventID(typeUTF8Text) || fileList.descriptorType == AEEventID(typeFileURL) {
+            if let urlString = fileList.stringValue, let url = URL(string: urlString) {
+                NSLog("📂 ChooseBrowser: Received file: \(url.path)")
+                ruleManager.handleURL(url)
+            }
+        } else if fileList.descriptorType == AEEventID(typeAEList) {
+            for i in 1...Int(fileList.numberOfItems) {
+                if let item = itemDescriptor(in: fileList, at: i),
+                   let urlString = item.stringValue,
+                   let url = URL(string: urlString) {
+                    NSLog("📂 ChooseBrowser: Received file: \(url.path)")
+                    ruleManager.handleURL(url)
+                }
+            }
+        }
+    }
+    
+    private func itemDescriptor(in list: NSAppleEventDescriptor, at index: Int) -> NSAppleEventDescriptor? {
+        return list.atIndex(index)
+    }
+    
+    // Document open handler — Finder'dan veya `open file.html` ile açılan dosyalar
+    func application(_ sender: NSApplication, openFile filename: String) -> Bool {
+        let url = URL(fileURLWithPath: filename)
+        NSLog("📂 ChooseBrowser: Received file (delegate): \(url.path)")
+        ruleManager.handleURL(url)
+        return true
+    }
+    
+    // Birden fazla dosya açma desteği
+    func application(_ sender: NSApplication, openFiles filenames: [String]) {
+        for filename in filenames {
+            let url = URL(fileURLWithPath: filename)
+            NSLog("📂 ChooseBrowser: Received file (delegate): \(url.path)")
+            ruleManager.handleURL(url)
+        }
     }
 }

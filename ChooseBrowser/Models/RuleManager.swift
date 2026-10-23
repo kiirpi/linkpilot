@@ -39,6 +39,13 @@ class RuleManager: ObservableObject {
         // Clean old entries
         cleanupRecentlyOpened()
         
+        // Local files (file://) → open directly in Safari (no domain rules apply)
+        if url.isFileURL {
+            NSLog("📄 ChooseBrowser: Local file detected, opening in Safari: \(url.path)")
+            openInSafari(url)
+            return
+        }
+        
         NSLog("🔍 ChooseBrowser: Checking rules for: \(url.host ?? "unknown")")
         
         if let rule = findMatchingRule(for: url) {
@@ -48,6 +55,22 @@ class RuleManager: ObservableObject {
             NSLog("⚠️ ChooseBrowser: No rule found, using default browser")
             openURLWithDefault(url)
         }
+    }
+    
+    private func openInSafari(_ url: URL) {
+        guard let safariURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Safari") else {
+            NSLog("❌ ChooseBrowser: Safari not found")
+            NSWorkspace.shared.open(url)
+            return
+        }
+        let config = NSWorkspace.OpenConfiguration()
+        NSWorkspace.shared.open([url], withApplicationAt: safariURL, configuration: config) { _, error in
+            if let error = error {
+                NSLog("❌ ChooseBrowser: Error opening file: \(error.localizedDescription)")
+            }
+        }
+        let filename = url.lastPathComponent
+        showNotification(title: "Opened in Safari", message: filename)
     }
     
     private func cleanupRecentlyOpened() {
