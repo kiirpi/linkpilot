@@ -4,6 +4,11 @@ import AppKit
 
 class RuleManager: ObservableObject {
     @Published var rules: [BrowserRule] = []
+    @Published var defaultBrowser: Browser = .safari {
+        didSet {
+            saveDefaultBrowser()
+        }
+    }
     
     // Persistent JSON file - can be shared between app and external scripts
     private var rulesFileURL: URL {
@@ -22,6 +27,7 @@ class RuleManager: ObservableObject {
     
     init() {
         loadRules()
+        loadDefaultBrowser()
     }
     
     func handleURL(_ url: URL) {
@@ -142,20 +148,8 @@ class RuleManager: ObservableObject {
     }
     
     func openURLWithDefault(_ url: URL) {
-        // If ChooseBrowser is the default browser, open in Safari to avoid loop
-        if Bundle.main.bundleIdentifier == LSCopyDefaultHandlerForURLScheme("https" as CFString)?.takeRetainedValue() as String? {
-            NSLog("⚠️ ChooseBrowser: ChooseBrowser is default browser, opening in Safari instead")
-            if let safariURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Safari") {
-                let config = NSWorkspace.OpenConfiguration()
-                NSWorkspace.shared.open([url], withApplicationAt: safariURL, configuration: config) { _, _ in }
-            } else {
-                // Safari not found, just open with system default
-                NSWorkspace.shared.open(url)
-            }
-        } else {
-            // ChooseBrowser is not default, safe to use system default
-            NSWorkspace.shared.open(url)
-        }
+        NSLog("🔄 ChooseBrowser: Opening with default browser: \(defaultBrowser.rawValue)")
+        openURL(url, with: defaultBrowser)
     }
     
     func addRule(domain: String, browser: Browser) {
@@ -206,6 +200,19 @@ class RuleManager: ObservableObject {
         } catch {
             NSLog("❌ Failed to save rules: \(error)")
         }
+    }
+    
+    private func loadDefaultBrowser() {
+        if let savedBrowser = UserDefaults.standard.string(forKey: "defaultBrowser"),
+           let browser = Browser(rawValue: savedBrowser) {
+            defaultBrowser = browser
+            NSLog("⚙️ Loaded default browser: \(browser.rawValue)")
+        }
+    }
+    
+    private func saveDefaultBrowser() {
+        UserDefaults.standard.set(defaultBrowser.rawValue, forKey: "defaultBrowser")
+        NSLog("⚙️ Saved default browser: \(defaultBrowser.rawValue)")
     }
     
     func showNotification(title: String, message: String) {

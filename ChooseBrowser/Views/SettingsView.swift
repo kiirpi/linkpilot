@@ -35,7 +35,27 @@ struct RulesSettingsView: View {
     @EnvironmentObject var ruleManager: RuleManager
     
     var body: some View {
-        VStack {
+        VStack(alignment: .leading, spacing: 16) {
+            // Default Browser Picker
+            GroupBox(label: Label("Default Browser", systemImage: "globe").font(.headline)) {
+                HStack {
+                    Text("When no rule matches, open in:")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Picker("", selection: $ruleManager.defaultBrowser) {
+                        ForEach(Browser.allCases, id: \.self) { browser in
+                            Text(browser.rawValue).tag(browser)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+                .padding(.vertical, 4)
+            }
+            
+            // Rules list
+            Divider()
+            
             if ruleManager.rules.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "tray")
